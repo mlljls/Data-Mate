@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Studio AI</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #0a0d14;
+    --bg2: #0f1320;
+    --bg3: #151a2e;
+    --bg4: #1c2340;
+    --accent: #4f8ef7;
+    --accent2: #7c3aed;
+    --accent3: #06d6a0;
+    --accent4: #f59e0b;
+    --danger: #ef4444;
+    --warn: #f59e0b;
+    --success: #10b981;
+    --text: #e8ecf4;
+    --text2: #8892aa;
+    --text3: #4a5568;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(79,142,247,0.3);
+    --font: 'IBM Plex Sans Arabic', sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+    --r: 10px;
+    --r2: 16px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; }
+  body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 13px; }
+
+  /* Layout */
+  .app { display: grid; grid-template-rows: 52px 1fr; height: 100vh; }
+  .topbar { display: flex; align-items: center; gap: 0; border-bottom: 1px solid var(--border); background: var(--bg2); padding: 0 16px; }
+  .logo { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: var(--text); letter-spacing: -0.3px; margin-left: 20px; }
+  .logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+  .nav-tabs { display: flex; height: 52px; }
+  .nav-tab { padding: 0 18px; height: 100%; display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--text2); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; white-space: nowrap; }
+  .nav-tab:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+  .nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .nav-tab svg { opacity: 0.7; }
+  .topbar-actions { margin-right: auto; display: flex; gap: 8px; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: var(--r); border: 1px solid var(--border); background: transparent; color: var(--text2); font-family: var(--font); font-size: 12px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+  .btn:hover { color: var(--text); border-color: var(--border2); background: rgba(79,142,247,0.08); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 500; }
+  .btn.primary:hover { background: #3b7de8; }
+  .btn.accent2 { background: var(--accent2); border-color: var(--accent2); color: #fff; }
+  .btn.accent2:hover { background: #6d28d9; }
+  .btn.success { background: var(--success); border-color: var(--success); color: #fff; }
+  .btn.sm { padding: 5px 10px; font-size: 11px; }
+  .btn.danger { background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.3); color: var(--danger); }
+  .btn.danger:hover { background: rgba(239,68,68,0.25); }
+
+  .workspace { display: grid; grid-template-columns: 220px 1fr; height: calc(100vh - 52px); overflow: hidden; }
+  .sidebar { background: var(--bg2); border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+  .sidebar-section { padding: 12px; border-bottom: 1px solid var(--border); }
+  .sidebar-title { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--text3); margin-bottom: 10px; }
+  .sidebar-stat { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; }
+  .sidebar-stat .slabel { font-size: 11.5px; color: var(--text2); }
+  .sidebar-stat .sval { font-family: var(--mono); font-size: 12px; color: var(--text); font-weight: 500; }
+  .col-item { padding: 6px 8px; border-radius: 6px; margin-bottom: 2px; cursor: pointer; transition: background 0.1s; display: flex; align-items: center; gap: 7px; }
+  .col-item:hover { background: rgba(255,255,255,0.05); }
+  .col-type { font-size: 9px; font-family: var(--mono); padding: 1px 5px; border-radius: 4px; font-weight: 500; }
+  .type-num { background: rgba(79,142,247,0.2); color: var(--accent); }
+  .type-str { background: rgba(6,214,160,0.2); color: var(--accent3); }
+  .type-date { background: rgba(245,158,11,0.15); color: var(--accent4); }
+  .col-name { font-size: 12px; color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .issue-badge { font-size: 10px; padding: 1px 6px; border-radius: 20px; }
+  .ib-null { background: rgba(239,68,68,0.2); color: var(--danger); }
+  .ib-dup { background: rgba(245,158,11,0.2); color: var(--warn); }
+
+  .main { display: flex; flex-direction: column; overflow: hidden; }
+
+  /* Sheets tabs */
+  .sheets-bar { display: flex; align-items: center; gap: 0; border-bottom: 1px solid var(--border); background: var(--bg2); padding: 0 12px; height: 36px; }
+  .sheet-tab { padding: 0 14px; height: 100%; display: flex; align-items: center; font-size: 11.5px; color: var(--text2); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.1s; gap: 6px; }
+  .sheet-tab:hover { color: var(--text); }
+  .sheet-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* Content panels */
+  .panel { display: none; flex: 1; overflow: hidden; flex-direction: column; }
+  .panel.active { display: flex; }
+
+  /* Upload */
+  .upload-panel { flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 20px; }
+  .drop-zone { width: 440px; border: 2px dashed rgba(79,142,247,0.3); border-radius: var(--r2); padding: 48px 40px; text-align: center; cursor: pointer; transition: all 0.2s; background: rgba(79,142,247,0.03); }
+  .drop-zone:hover, .drop-zone.drag { border-color: var(--accent); background: rgba(79,142,247,0.08); }
+  .drop-zone svg { display: block; margin: 0 auto 16px; opacity: 0.4; }
+  .drop-title { font-size: 16px; font-weight: 500; color: var(--text); margin-bottom: 6px; }
+  .drop-sub { font-size: 13px; color: var(--text2); }
+  .drop-formats { display: flex; gap: 8px; justify-content: center; margin-top: 16px; }
+  .fmt-tag { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-family: var(--mono); border: 1px solid var(--border); color: var(--text2); }
+  .demo-cards { display: flex; gap: 10px; }
+  .demo-card { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--r); padding: 14px 18px; cursor: pointer; transition: all 0.15s; text-align: center; }
+  .demo-card:hover { border-color: var(--border2); background: var(--bg4); }
+  .demo-card .dc-icon { font-size: 22px; margin-bottom: 6px; }
+  .demo-card .dc-name { font-size: 12px; font-weight: 500; color: var(--text); }
+  .demo-card .dc-sub { font-size: 11px; color: var(--text2); margin-top: 2px; }
+
+  /* Grid / Table */
+  .grid-toolbar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--bg2); flex-wrap: wrap; }
+  .search-box { display: flex; align-items: center; gap: 6px; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--r); padding: 5px 10px; flex: 1; max-width: 260px; }
+  .search-box input { background: none; border: none; outline: none; font-family: var(--font); font-size: 12px; color: var(--text); width: 100%; }
+  .search-box input::placeholder { color: var(--text3); }
+  .separator { width: 1px; height: 20px; background: var(--border); }
+  .table-wrap { flex: 1; overflow: auto; }
+  .data-table { width: 100%; border-collapse: collapse; min-width: 600px; }
+  .data-table th { position: sticky; top: 0; background: var(--bg3); padding: 9px 12px; text-align: right; font-size: 11.5px; font-weight: 600; color: var(--text2); border-bottom: 1px solid var(--border); white-space: nowrap; cursor: pointer; user-select: none; z-index: 1; }
+  .data-table th:hover { color: var(--text); background: var(--bg4); }
+  .data-table th .th-inner { display: flex; align-items: center; gap: 5px; }
+  .data-table td { padding: 7px 12px; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 12px; color: var(--text); white-space: nowrap; }
+  .data-table tr:hover td { background: rgba(255,255,255,0.02); }
+  .data-table tr.dup-row td { background: rgba(245,158,11,0.04); }
+  .cell-null { color: var(--danger) !important; font-style: italic; opacity: 0.7; }
+  .cell-num { font-family: var(--mono); color: #7dd3fc; text-align: left; }
+  .row-num { color: var(--text3); font-family: var(--mono); font-size: 10.5px; background: var(--bg3); position: sticky; right: 0; }
+  .col-sort-asc::after { content: ' ↑'; font-size: 10px; }
+  .col-sort-desc::after { content: ' ↓'; font-size: 10px; }
+
+  /* Clean Panel */
+  .clean-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px; flex: 1; overflow: auto; }
+  .clean-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r2); padding: 16px; }
+  .clean-card h3 { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .issue-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--bg3); border-radius: var(--r); margin-bottom: 8px; border: 1px solid var(--border); }
+  .issue-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 14px; }
+  .ii-red { background: rgba(239,68,68,0.15); }
+  .ii-amber { background: rgba(245,158,11,0.15); }
+  .ii-blue { background: rgba(79,142,247,0.15); }
+  .issue-info { flex: 1; }
+  .issue-title { font-size: 12.5px; font-weight: 500; color: var(--text); }
+  .issue-sub { font-size: 11px; color: var(--text2); margin-top: 2px; }
+  .progress-bar { height: 4px; background: var(--bg4); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 2px; transition: width 0.6s ease; }
+  .clean-op { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--bg3); border-radius: var(--r); margin-bottom: 8px; border: 1px solid var(--border); cursor: pointer; transition: border-color 0.15s; }
+  .clean-op:hover { border-color: var(--border2); }
+  .clean-op input[type=checkbox] { accent-color: var(--accent); width: 14px; height: 14px; }
+  .clean-op .op-info { flex: 1; }
+  .clean-op .op-title { font-size: 12.5px; font-weight: 500; color: var(--text); }
+  .clean-op .op-sub { font-size: 11px; color: var(--text2); margin-top: 2px; }
+  select { background: var(--bg3); border: 1px solid var(--border); color: var(--text2); border-radius: 6px; padding: 4px 8px; font-family: var(--font); font-size: 11px; outline: none; }
+
+  /* Analytics */
+  .analytics-layout { display: grid; grid-template-rows: auto 1fr; flex: 1; overflow: hidden; }
+  .kpi-bar { display: flex; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--bg2); overflow-x: auto; }
+  .kpi-card { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--r); padding: 12px 16px; min-width: 130px; flex-shrink: 0; }
+  .kpi-label { font-size: 10.5px; color: var(--text2); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .kpi-val { font-family: var(--mono); font-size: 20px; font-weight: 500; color: var(--text); }
+  .kpi-sub { font-size: 10.5px; color: var(--text3); margin-top: 3px; }
+  .charts-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; padding: 14px; overflow: auto; }
+  .chart-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r2); padding: 16px; }
+  .chart-card h3 { font-size: 12px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 14px; }
+  .chart-card canvas { max-height: 200px; }
+
+  /* AI Panel */
+  .ai-layout { display: grid; grid-template-columns: 1fr 340px; flex: 1; overflow: hidden; }
+  .ai-results { flex: 1; overflow-y: auto; padding: 16px; }
+  .ai-chat { display: flex; flex-direction: column; border-right: 1px solid var(--border); background: var(--bg2); }
+  .chat-history { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .chat-msg { padding: 10px 13px; border-radius: var(--r); font-size: 12.5px; line-height: 1.6; max-width: 100%; }
+  .msg-user { background: rgba(79,142,247,0.12); border: 1px solid rgba(79,142,247,0.2); color: var(--text); align-self: flex-end; }
+  .msg-ai { background: var(--bg3); border: 1px solid var(--border); color: var(--text); }
+  .msg-ai strong { color: var(--accent); }
+  .msg-thinking { display: flex; align-items: center; gap: 8px; padding: 10px 13px; color: var(--text2); font-size: 12px; }
+  .dot-anim { display: flex; gap: 4px; }
+  .dot-anim span { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); animation: dotPulse 1.2s infinite; }
+  .dot-anim span:nth-child(2) { animation-delay: 0.2s; }
+  .dot-anim span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes dotPulse { 0%,80%,100% { opacity: 0.3; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1); } }
+  .chat-input-area { padding: 10px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+  .quick-prompts { display: flex; flex-wrap: wrap; gap: 5px; }
+  .quick-btn { padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border); background: transparent; color: var(--text2); font-family: var(--font); font-size: 11px; cursor: pointer; transition: all 0.12s; }
+  .quick-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(79,142,247,0.08); }
+  .chat-input-row { display: flex; gap: 6px; }
+  .chat-input { flex: 1; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--r); padding: 8px 12px; font-family: var(--font); font-size: 12.5px; color: var(--text); outline: none; resize: none; height: 64px; transition: border-color 0.15s; }
+  .chat-input:focus { border-color: var(--border2); }
+  .chat-input::placeholder { color: var(--text3); }
+
+  /* AI Result Card */
+  .ai-result-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r2); padding: 16px; margin-bottom: 14px; }
+  .ai-result-card h3 { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .ai-result-card p { font-size: 13px; color: var(--text2); line-height: 1.7; }
+  .insight-row { display: flex; gap: 8px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .insight-row:last-child { border-bottom: none; }
+  .ins-num { font-family: var(--mono); font-size: 11px; color: var(--accent); min-width: 20px; }
+  .ins-text { font-size: 12.5px; color: var(--text2); line-height: 1.5; }
+  .ins-text strong { color: var(--text); }
+  .tag-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .tag { padding: 4px 10px; border-radius: 20px; font-size: 11px; border: 1px solid; }
+  .tag-blue { border-color: rgba(79,142,247,0.4); color: var(--accent); background: rgba(79,142,247,0.1); }
+  .tag-green { border-color: rgba(6,214,160,0.4); color: var(--accent3); background: rgba(6,214,160,0.1); }
+  .tag-amber { border-color: rgba(245,158,11,0.4); color: var(--warn); background: rgba(245,158,11,0.1); }
+  .tag-red { border-color: rgba(239,68,68,0.4); color: var(--danger); background: rgba(239,68,68,0.1); }
+
+  /* Clean log */
+  .clean-log { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--r); padding: 12px; font-family: var(--mono); font-size: 11px; color: var(--text2); max-height: 200px; overflow-y: auto; }
+  .log-line { padding: 2px 0; }
+  .log-ok { color: var(--success); }
+  .log-warn { color: var(--warn); }
+  .log-info { color: var(--accent); }
+
+  /* Toast */
+  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--bg3); border: 1px solid var(--border2); color: var(--text); padding: 10px 20px; border-radius: 30px; font-size: 12.5px; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 999; display: flex; align-items: center; gap: 8px; }
+  #toast.show { opacity: 1; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+
+  /* No data */
+  .no-data { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--text3); font-size: 13px; }
+  .no-data svg { opacity: 0.3; }
+
+  .glow { box-shadow: 0 0 20px rgba(79,142,247,0.15); }
+
+  input[type=file] { display: none; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- Top Bar -->
+  <div class="topbar">
+    <div class="logo">
+      <div class="logo-dot"></div>
+      Data Studio AI
+    </div>
+    <div class="nav-tabs">
+      <div class="nav-tab active" onclick="setNav('home')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+        الرئيسية
+      </div>
+      <div class="nav-tab" onclick="setNav('data')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+        البيانات
+      </div>
+      <div class="nav-tab" onclick="setNav('clean')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z"/></svg>
+        التنظيف
+      </div>
+      <div class="nav-tab" onclick="setNav('analytics')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        التحليل
+      </div>
+      <div class="nav-tab" onclick="setNav('ai')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+        تحليل AI
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <input type="file" id="fileInput" accept=".csv,.json,.tsv" onchange="handleFile(this)">
+      <button class="btn" onclick="document.getElementById('fileInput').click()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+        رفع ملف
+      </button>
+      <button class="btn primary" onclick="exportCSV()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+        تصدير CSV
+      </button>
+    </div>
+  </div>
+
+  <div class="workspace">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-title">إحصاءات الملف</div>
+        <div class="sidebar-stat"><span class="slabel">الصفوف</span><span class="sval" id="sb-rows">—</span></div>
+        <div class="sidebar-stat"><span class="slabel">الأعمدة</span><span class="sval" id="sb-cols">—</span></div>
+        <div class="sidebar-stat"><span class="slabel">فارغة</span><span class="sval" id="sb-nulls" style="color:var(--danger)">—</span></div>
+        <div class="sidebar-stat"><span class="slabel">مكررة</span><span class="sval" id="sb-dups" style="color:var(--warn)">—</span></div>
+        <div class="sidebar-stat"><span class="slabel">جودة البيانات</span><span class="sval" id="sb-quality" style="color:var(--success)">—</span></div>
+      </div>
+      <div class="sidebar-section" style="flex:1; overflow-y:auto;">
+        <div class="sidebar-title">الأعمدة</div>
+        <div id="col-list"></div>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main">
+      <div class="sheets-bar">
+        <div class="sheet-tab active" onclick="setSheet('data')">📊 البيانات</div>
+        <div class="sheet-tab" onclick="setSheet('summary')">📋 ملخص</div>
+      </div>
+
+      <!-- Home Panel -->
+      <div class="panel active" id="panel-home">
+        <div class="upload-panel">
+          <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()"
+               ondragover="event.preventDefault();this.classList.add('drag')"
+               ondragleave="this.classList.remove('drag')"
+               ondrop="handleDrop(event)">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+            </svg>
+            <div class="drop-title">ارفع ملف البيانات</div>
+            <div class="drop-sub">اسحب وأفلت أو اضغط للاختيار</div>
+            <div class="drop-formats">
+              <span class="fmt-tag">CSV</span>
+              <span class="fmt-tag">JSON</span>
+              <span class="fmt-tag">TSV</span>
+            </div>
+          </div>
+          <div style="color:var(--text3); font-size:12px;">أو جرب بيانات تجريبية</div>
+          <div class="demo-cards">
+            <div class="demo-card" onclick="loadDemo('sales')">
+              <div class="dc-icon">🏪</div>
+              <div class="dc-name">بيانات مبيعات</div>
+              <div class="dc-sub">120 صف · 8 أعمدة</div>
+            </div>
+            <div class="demo-card" onclick="loadDemo('employees')">
+              <div class="dc-icon">👥</div>
+              <div class="dc-name">بيانات موظفين</div>
+              <div class="dc-sub">85 صف · 10 أعمدة</div>
+            </div>
+            <div class="demo-card" onclick="loadDemo('finance')">
+              <div class="dc-icon">💰</div>
+              <div class="dc-name">بيانات مالية</div>
+              <div class="dc-sub">200 صف · 7 أعمدة</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Data Panel -->
+      <div class="panel" id="panel-data">
+        <div class="grid-toolbar">
+          <div class="search-box">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text3)"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" placeholder="بحث في البيانات..." id="searchInput" oninput="filterTable()">
+          </div>
+          <div class="separator"></div>
+          <button class="btn sm" onclick="toggleHighlight()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            إبراز المشاكل
+          </button>
+          <button class="btn sm" onclick="setNav('clean')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z"/></svg>
+            تنظيف البيانات
+          </button>
+          <span id="row-count-label" style="font-size:11px; color:var(--text3); margin-right:auto;"></span>
+        </div>
+        <div class="table-wrap" id="table-wrap">
+          <div class="no-data">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+            لم يتم تحميل أي بيانات
+          </div>
+        </div>
+      </div>
+
+      <!-- Clean Panel -->
+      <div class="panel" id="panel-clean">
+        <div class="clean-layout">
+          <div>
+            <div class="clean-card">
+              <h3>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                المشاكل المكتشفة
+              </h3>
+              <div id="issues-container">
+                <div class="no-data" style="height:120px; font-size:12px;">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  حمّل بيانات لاكتشاف المشاكل
+                </div>
+              </div>
+            </div>
+            <div class="clean-card" style="margin-top:14px;">
+              <h3>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent3)" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+                سجل العمليات
+              </h3>
+              <div class="clean-log" id="clean-log">
+                <div class="log-line log-info">// في انتظار البيانات...</div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="clean-card">
+              <h3>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z"/></svg>
+                عمليات التنظيف
+              </h3>
+
+              <label class="clean-op">
+                <input type="checkbox" id="op-nulls" checked>
+                <div class="op-info">
+                  <div class="op-title">معالجة القيم الفارغة</div>
+                  <div class="op-sub">استبدال بـ: <select id="null-strategy" onclick="event.stopPropagation()"><option value="median">الوسيط (للأرقام)</option><option value="mean">المتوسط (للأرقام)</option><option value="zero">صفر</option><option value="unknown">غير محدد (للنصوص)</option><option value="remove">حذف الصف</option></select></div>
+                </div>
+              </label>
+
+              <label class="clean-op">
+                <input type="checkbox" id="op-dups" checked>
+                <div class="op-info">
+                  <div class="op-title">حذف الصفوف المكررة</div>
+                  <div class="op-sub">الاحتفاظ بأول ظهور فقط</div>
+                </div>
+              </label>
+
+              <label class="clean-op">
+                <input type="checkbox" id="op-trim" checked>
+                <div class="op-info">
+                  <div class="op-title">إزالة المسافات الزائدة</div>
+                  <div class="op-sub">Trim جميع الخلايا النصية</div>
+                </div>
+              </label>
+
+              <label class="clean-op">
+                <input type="checkbox" id="op-case">
+                <div class="op-info">
+                  <div class="op-title">توحيد حالة النصوص</div>
+                  <div class="op-sub">تحويل إلى: <select id="case-strategy" onclick="event.stopPropagation()"><option>حروف صغيرة</option><option>حروف كبيرة</option></select></div>
+                </div>
+              </label>
+
+              <label class="clean-op">
+                <input type="checkbox" id="op-outliers">
+                <div class="op-info">
+                  <div class="op-title">معالجة القيم الشاذة</div>
+                  <div class="op-sub">حذف القيم خارج 3 انحرافات معيارية</div>
+                </div>
+              </label>
+
+              <div style="margin-top:14px; display:flex; gap:8px; flex-wrap:wrap;">
+                <button class="btn primary" onclick="runClean()">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  تشغيل التنظيف
+                </button>
+                <button class="btn accent2" onclick="aiAutoClean()">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+                  AI Auto-Clean
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Analytics Panel -->
+      <div class="panel" id="panel-analytics">
+        <div class="analytics-layout">
+          <div class="kpi-bar" id="kpi-bar">
+            <div class="no-data" style="height:auto; flex-direction:row; font-size:12px; padding:0; color:var(--text3);">حمّل بيانات لعرض KPIs</div>
+          </div>
+          <div class="charts-grid" id="charts-grid">
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Panel -->
+      <div class="panel" id="panel-ai">
+        <div class="ai-layout">
+          <div class="ai-results" id="ai-results">
+            <div class="no-data" style="height:300px;">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+              اسأل AI عن بياناتك وسيحللها لك
+            </div>
+          </div>
+          <div class="ai-chat">
+            <div style="padding:12px; border-bottom:1px solid var(--border);">
+              <div style="font-size:13px; font-weight:600; color:var(--text); display:flex; align-items:center; gap:8px;">
+                <div style="width:8px;height:8px;border-radius:50%;background:var(--success);box-shadow:0 0 8px var(--success);"></div>
+                Claude AI محلل
+              </div>
+              <div style="font-size:11px; color:var(--text2); margin-top:2px;">يحلل بياناتك ويعطيك insights</div>
+            </div>
+            <div class="chat-history" id="chat-history">
+              <div class="chat-msg msg-ai">
+                👋 مرحبًا! أنا Claude. حمّل بياناتك وسأحللها لك وأعطيك رؤى وتوصيات عملية. يمكنني:<br><br>
+                • <strong>تحليل الاتجاهات والأنماط</strong><br>
+                • <strong>اكتشاف الشذوذات والمشاكل</strong><br>
+                • <strong>توصيات لتحسين جودة البيانات</strong><br>
+                • <strong>الإجابة على أي سؤال عن البيانات</strong>
+              </div>
+            </div>
+            <div class="chat-input-area">
+              <div class="quick-prompts" id="quick-prompts">
+                <button class="quick-btn" onclick="sendQuick('حلل البيانات وأعطني أهم الاكتشافات')">📊 تحليل شامل</button>
+                <button class="quick-btn" onclick="sendQuick('ما هي مشاكل جودة البيانات؟')">🔍 جودة البيانات</button>
+                <button class="quick-btn" onclick="sendQuick('ما التوزيع الإحصائي للبيانات الرقمية؟')">📈 إحصاءات</button>
+                <button class="quick-btn" onclick="sendQuick('ما أبرز الاتجاهات والأنماط في البيانات؟')">💡 أنماط</button>
+                <button class="quick-btn" onclick="sendQuick('أعطني توصيات لتحسين وتنظيف هذه البيانات')">✨ توصيات</button>
+              </div>
+              <div class="chat-input-row">
+                <textarea class="chat-input" id="chat-input" placeholder="اسألني عن بياناتك..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
+                <button class="btn primary" style="align-self:flex-end;height:36px;" onclick="sendChat()">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ============ STATE ============
+let rawData = [], cleanData = [], columns = [], currentNav = 'home';
+let sortCol = null, sortDir = 1, highlightIssues = false;
+let charts = {};
+let chatMessages = [];
+
+// ============ NAV ============
+function setNav(name) {
+  currentNav = name;
+  document.querySelectorAll('.nav-tab').forEach((t,i) => t.classList.toggle('active', ['home','data','clean','analytics','ai'][i] === name));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  if (name === 'analytics' && cleanData.length) renderAnalytics();
+  if (name === 'clean' && cleanData.length) renderIssues();
+}
+
+function setSheet(s) {
+  document.querySelectorAll('.sheet-tab').forEach((t,i) => t.classList.toggle('active', ['data','summary'][i] === s));
+}
+
+// ============ UPLOAD ============
+function handleFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  const reader = new FileReader();
+  reader.onload = e => {
+    if (ext === 'json') {
+      try { const d = JSON.parse(e.target.result); loadData(Array.isArray(d) ? d : [d]); } catch { toast('❌ خطأ في قراءة JSON'); }
+    } else {
+      const result = Papa.parse(e.target.result, { header: true, skipEmptyLines: true, dynamicTyping: true });
+      loadData(result.data);
+    }
+    toast('✓ تم تحميل ' + file.name);
+  };
+  reader.readAsText(file);
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file) { document.getElementById('fileInput').files = e.dataTransfer.files; handleFile(document.getElementById('fileInput')); }
+}
+
+// ============ DEMO DATA ============
+function loadDemo(type) {
+  let data = [];
+  if (type === 'sales') {
+    const depts = ['شمال','جنوب','شرق','غرب','وسط'];
+    const products = ['لابتوب','موبايل','تابلت','سماعات','شاشة'];
+    for (let i = 0; i < 120; i++) {
+      const nullChance = Math.random();
+      data.push({
+        id: i+1,
+        التاريخ: `2024-${String(Math.ceil((i%12)+1)).padStart(2,'0')}-01`,
+        المنتج: products[i%5],
+        المنطقة: depts[i%5],
+        المبيعات: nullChance < 0.07 ? null : Math.round(Math.random()*50000+5000),
+        الكمية: nullChance < 0.05 ? null : Math.round(Math.random()*100+1),
+        العميل: nullChance < 0.06 ? '' : `عميل ${i+1}`,
+        التقييم: Math.random() < 0.1 ? null : +(Math.random()*2+3).toFixed(1),
+        الحالة: ['مكتمل','معلق','ملغي'][Math.floor(Math.random()*3)]
+      });
+    }
+    // Add duplicates
+    data.push(...data.slice(0,5));
+  } else if (type === 'employees') {
+    const depts = ['تقنية','مبيعات','موارد بشرية','مالية','تسويق'];
+    const cities = ['القاهرة','الإسكندرية','الجيزة','أسوان','الأقصر'];
+    for (let i = 0; i < 85; i++) {
+      const n = Math.random();
+      data.push({
+        id: i+1,
+        الاسم: n < 0.05 ? '' : `موظف ${i+1}`,
+        القسم: depts[i%5],
+        المدينة: cities[Math.floor(Math.random()*5)],
+        الراتب: n < 0.08 ? null : Math.round(Math.random()*20000+5000),
+        العمر: n < 0.06 ? null : Math.round(Math.random()*30+25),
+        سنوات_الخبرة: Math.round(Math.random()*15),
+        التقييم: Math.random()<0.1 ? null : +(Math.random()*2+3).toFixed(1),
+        الحالة: ['نشط','إجازة','مستقيل'][Math.floor(Math.random()*10)<8?0:Math.floor(Math.random()*3)],
+        البريد: n < 0.07 ? '' : `emp${i+1}@company.com`,
+        تاريخ_التعيين: `${2015+Math.floor(Math.random()*9)}-${String(Math.floor(Math.random()*12)+1).padStart(2,'0')}-01`
+      });
+    }
+    data.push(...data.slice(0,4));
+  } else {
+    const months = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+    for (let i = 0; i < 200; i++) {
+      const n = Math.random();
+      data.push({
+        id: i+1,
+        الشهر: months[i%12],
+        السنة: 2022 + Math.floor(i/12),
+        الإيرادات: n<0.06?null:Math.round(Math.random()*500000+50000),
+        المصروفات: n<0.05?null:Math.round(Math.random()*300000+30000),
+        الأرباح: n<0.07?null:Math.round(Math.random()*200000+20000),
+        الضرائب: n<0.04?null:+(Math.random()*0.25+0.1).toFixed(2),
+        القطاع: ['تجزئة','جملة','خدمات'][Math.floor(Math.random()*3)]
+      });
+    }
+    data.push(...data.slice(0,7));
+  }
+  loadData(data);
+  toast('✓ تم تحميل البيانات التجريبية');
+}
+
+function loadData(data) {
+  rawData = data;
+  cleanData = data.map(r => ({...r}));
+  columns = Object.keys(data[0] || {});
+  updateSidebar();
+  renderTable();
+  renderIssues();
+  if (currentNav === 'home') setNav('data'); else renderTable();
+}
+
+// ============ SIDEBAR ============
+function updateSidebar() {
+  const nullCount = countNulls(cleanData);
+  const dupCount = countDups(cleanData);
+  const total = cleanData.length * columns.length;
+  const quality = total > 0 ? Math.round(((total - nullCount) / total) * 100) : 0;
+  document.getElementById('sb-rows').textContent = cleanData.length;
+  document.getElementById('sb-cols').textContent = columns.length;
+  document.getElementById('sb-nulls').textContent = nullCount;
+  document.getElementById('sb-dups').textContent = dupCount;
+  document.getElementById('sb-quality').textContent = quality + '%';
+  const colList = document.getElementById('col-list');
+  colList.innerHTML = columns.map(c => {
+    const sample = cleanData.find(r => r[c] !== null && r[c] !== undefined && r[c] !== '');
+    const t = sample ? (typeof sample[c] === 'number' ? 'num' : c.toLowerCase().includes('تاريخ') || c.toLowerCase().includes('date') ? 'date' : 'str') : 'str';
+    const nulls = cleanData.filter(r => r[c] === null || r[c] === '' || r[c] === undefined).length;
+    return `<div class="col-item">
+      <span class="col-type type-${t}">${t === 'num' ? '123' : t === 'date' ? '📅' : 'ABC'}</span>
+      <span class="col-name">${c}</span>
+      ${nulls > 0 ? `<span class="issue-badge ib-null">${nulls}</span>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ============ TABLE ============
+function renderTable() {
+  if (!cleanData.length) return;
+  let filtered = [...cleanData];
+  const q = document.getElementById('searchInput')?.value?.toLowerCase();
+  if (q) filtered = filtered.filter(r => Object.values(r).some(v => String(v).toLowerCase().includes(q)));
+
+  if (sortCol !== null) {
+    filtered.sort((a,b) => {
+      const av = a[columns[sortCol]], bv = b[columns[sortCol]];
+      return (av < bv ? -1 : av > bv ? 1 : 0) * sortDir;
+    });
+  }
+
+  const seen = new Set(), dupKeys = new Set();
+  cleanData.forEach(r => { const k = JSON.stringify(r); if(seen.has(k)) dupKeys.add(k); else seen.add(k); });
+
+  document.getElementById('row-count-label').textContent = `${filtered.length} صف من أصل ${cleanData.length}`;
+  const display = filtered.slice(0, 500);
+  let html = `<table class="data-table"><thead><tr><th class="row-num">#</th>` +
+    columns.map((c,i) => `<th onclick="sortBy(${i})" class="${sortCol===i?(sortDir===1?'col-sort-asc':'col-sort-desc'):''}"><div class="th-inner">${c}</div></th>`).join('') +
+    `</tr></thead><tbody>`;
+  display.forEach((row, ri) => {
+    const isDup = dupKeys.has(JSON.stringify(row));
+    html += `<tr class="${isDup && highlightIssues ? 'dup-row' : ''}"><td class="row-num">${ri+1}</td>` +
+      columns.map(c => {
+        const v = row[c];
+        const isEmpty = v === null || v === undefined || v === '';
+        const isNum = typeof v === 'number';
+        let cls = '';
+        if (isEmpty && highlightIssues) cls = 'cell-null';
+        else if (isNum) cls = 'cell-num';
+        return `<td class="${cls}">${isEmpty ? '(فارغ)' : isNum ? v.toLocaleString() : v}</td>`;
+      }).join('') + '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('table-wrap').innerHTML = html;
+}
+
+function sortBy(i) {
+  if (sortCol === i) sortDir *= -1; else { sortCol = i; sortDir = 1; }
+  renderTable();
+}
+function filterTable() { renderTable(); }
+function toggleHighlight() { highlightIssues = !highlightIssues; renderTable(); toast(highlightIssues ? '👁 تم تفعيل إبراز المشاكل' : 'إبراز المشاكل مُوقف'); }
+
+// ============ CLEAN ============
+function countNulls(data) { return data.reduce((n,r) => n + Object.values(r).filter(v => v===null||v===undefined||v==='').length, 0); }
+function countDups(data) { const s = new Set(); let d = 0; data.forEach(r => { const k=JSON.stringify(r); if(s.has(k))d++; else s.add(k); }); return d; }
+
+function renderIssues() {
+  if (!cleanData.length) return;
+  const nullCount = countNulls(cleanData);
+  const dupCount = countDups(cleanData);
+  const spaceCount = cleanData.reduce((n,r) => n + Object.values(r).filter(v => typeof v === 'string' && v !== v.trim()).length, 0);
+  const outlierCols = columns.filter(c => {
+    const vals = cleanData.map(r=>r[c]).filter(v=>typeof v==='number');
+    if (vals.length < 5) return false;
+    const mean = vals.reduce((a,v)=>a+v,0)/vals.length;
+    const std = Math.sqrt(vals.reduce((a,v)=>a+(v-mean)**2,0)/vals.length);
+    return vals.some(v => Math.abs(v-mean) > 3*std);
+  });
+
+  const total = cleanData.length * columns.length;
+  let html = '';
+  if (nullCount) html += issueCard('ii-red','🔴','قيم ناقصة / فارغة', `${nullCount} خلية فارغة في البيانات`, nullCount, total, 'var(--danger)');
+  if (dupCount) html += issueCard('ii-amber','🟡','صفوف مكررة', `${dupCount} صف مكرر تماماً`, dupCount, cleanData.length, 'var(--warn)');
+  if (spaceCount) html += issueCard('ii-blue','🔵','مسافات زائدة', `${spaceCount} خلية تحتوي مسافات في البداية/النهاية`, spaceCount, total, 'var(--accent)');
+  if (outlierCols.length) html += issueCard('ii-amber','⚠️','قيم شاذة (Outliers)', `في الأعمدة: ${outlierCols.join('، ')}`, outlierCols.length, columns.length, 'var(--warn)');
+  if (!html) html = `<div style="text-align:center;padding:20px;color:var(--success);font-size:13px;">✅ البيانات نظيفة بالكامل!</div>`;
+  document.getElementById('issues-container').innerHTML = html;
+}
+
+function issueCard(iconCls, icon, title, sub, val, max, color) {
+  const pct = Math.round(Math.min((val/max)*100, 100));
+  return `<div class="issue-row"><div class="issue-icon ${iconCls}">${icon}</div>
+    <div class="issue-info">
+      <div class="issue-title">${title}</div>
+      <div class="issue-sub">${sub}</div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${color}"></div></div>
+    </div></div>`;
+}
+
+function addLog(msg, type='info') {
+  const log = document.getElementById('clean-log');
+  const line = document.createElement('div');
+  line.className = `log-line log-${type}`;
+  line.textContent = `[${new Date().toLocaleTimeString('ar-EG')}] ${msg}`;
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+}
+
+function runClean() {
+  if (!cleanData.length) { toast('⚠️ حمّل بيانات أولاً'); return; }
+  document.getElementById('clean-log').innerHTML = '';
+  addLog('بدء عملية التنظيف...', 'info');
+  let changed = 0;
+
+  if (document.getElementById('op-trim').checked) {
+    let c = 0;
+    cleanData = cleanData.map(r => {
+      const nr = {...r};
+      columns.forEach(k => { if(typeof nr[k]==='string' && nr[k]!==nr[k].trim()) { nr[k]=nr[k].trim(); c++; } });
+      return nr;
+    });
+    if (c) { addLog(`تم إزالة المسافات من ${c} خلية`, 'ok'); changed += c; }
+  }
+
+  if (document.getElementById('op-dups').checked) {
+    const before = cleanData.length;
+    const seen = new Set();
+    cleanData = cleanData.filter(r => { const k=JSON.stringify(r); if(seen.has(k)) return false; seen.add(k); return true; });
+    const removed = before - cleanData.length;
+    if (removed) { addLog(`تم حذف ${removed} صف مكرر`, 'ok'); changed += removed; }
+  }
+
+  if (document.getElementById('op-nulls').checked) {
+    const strategy = document.getElementById('null-strategy').value;
+    let c = 0;
+    if (strategy === 'remove') {
+      const before = cleanData.length;
+      cleanData = cleanData.filter(r => !Object.values(r).some(v => v===null||v===undefined||v===''));
+      c = before - cleanData.length;
+      if (c) addLog(`تم حذف ${c} صف يحتوي قيم فارغة`, 'warn');
+    } else {
+      columns.forEach(col => {
+        const vals = cleanData.map(r=>r[col]).filter(v=>typeof v==='number');
+        const isNum = vals.length > 0;
+        let fill;
+        if (isNum) {
+          if (strategy === 'mean') fill = +(vals.reduce((a,v)=>a+v,0)/vals.length).toFixed(2);
+          else if (strategy === 'median') { const s=[...vals].sort((a,b)=>a-b); fill = s[Math.floor(s.length/2)]; }
+          else fill = 0;
+        } else fill = 'غير محدد';
+        cleanData = cleanData.map(r => { if(r[col]===null||r[col]===undefined||r[col]===''){c++;return{...r,[col]:fill};} return r; });
+      });
+      if (c) addLog(`تم ملء ${c} خلية فارغة (${strategy})`, 'ok');
+    }
+    changed += c;
+  }
+
+  if (document.getElementById('op-outliers').checked) {
+    let c = 0;
+    columns.forEach(col => {
+      const vals = cleanData.map(r=>r[col]).filter(v=>typeof v==='number');
+      if (vals.length < 5) return;
+      const mean = vals.reduce((a,v)=>a+v,0)/vals.length;
+      const std = Math.sqrt(vals.reduce((a,v)=>a+(v-mean)**2,0)/vals.length);
+      const before = cleanData.length;
+      cleanData = cleanData.filter(r => typeof r[col]!=='number' || Math.abs(r[col]-mean)<=3*std);
+      c += before - cleanData.length;
+    });
+    if (c) { addLog(`تم إزالة ${c} قيمة شاذة (outlier)`, 'warn'); changed += c; }
+  }
+
+  addLog(`✅ انتهى التنظيف — تم معالجة ${changed} عنصر`, 'ok');
+  updateSidebar();
+  renderTable();
+  renderIssues();
+  toast(`✓ التنظيف اكتمل — ${changed} إصلاح`);
+}
+
+async function aiAutoClean() {
+  if (!cleanData.length) { toast('⚠️ حمّل بيانات أولاً'); return; }
+  toast('🤖 AI يحلل البيانات...');
+  document.getElementById('clean-log').innerHTML = '';
+  addLog('AI يفحص البيانات...', 'info');
+  const summary = buildDataSummary();
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: `أنت خبير تنظيف بيانات. حلل هذه البيانات وقرر أفضل استراتيجية للتنظيف. أجب بـ JSON فقط بهذا الشكل:
+{"nullStrategy":"mean|median|zero|unknown|remove","removeDups":true,"trimSpaces":true,"removeOutliers":false,"explanation":"شرح باللغة العربية لماذا اخترت هذه الاستراتيجية"}
+
+ملخص البيانات:
+${JSON.stringify(summary)}`
+        }]
+      })
+    });
+    const d = await res.json();
+    const text = d.content[0].text;
+    const clean = text.replace(/```json|```/g,'').trim();
+    const plan = JSON.parse(clean);
+    document.getElementById('op-nulls').checked = true;
+    document.getElementById('null-strategy').value = plan.nullStrategy || 'median';
+    document.getElementById('op-dups').checked = plan.removeDups !== false;
+    document.getElementById('op-trim').checked = plan.trimSpaces !== false;
+    document.getElementById('op-outliers').checked = !!plan.removeOutliers;
+    addLog(`🤖 AI اختار: nulls→${plan.nullStrategy}, dups=${plan.removeDups}, outliers=${plan.removeOutliers}`, 'info');
+    addLog(`💡 ${plan.explanation}`, 'ok');
+    runClean();
+  } catch(e) {
+    addLog('خطأ في الاتصال بـ AI — تطبيق إعدادات افتراضية', 'warn');
+    runClean();
+  }
+}
+
+// ============ ANALYTICS ============
+function renderAnalytics() {
+  if (!cleanData.length) return;
+  const numCols = columns.filter(c => cleanData.some(r => typeof r[c] === 'number'));
+  const catCols = columns.filter(c => !numCols.includes(c));
+
+  // KPIs
+  let kpiHtml = '';
+  numCols.slice(0,4).forEach(c => {
+    const vals = cleanData.map(r=>r[c]).filter(v=>typeof v==='number');
+    const sum = vals.reduce((a,v)=>a+v,0);
+    const avg = vals.length ? sum/vals.length : 0;
+    kpiHtml += `<div class="kpi-card">
+      <div class="kpi-label">${c}</div>
+      <div class="kpi-val">${avg >= 1000 ? (avg/1000).toFixed(1)+'K' : avg.toFixed(1)}</div>
+      <div class="kpi-sub">متوسط · المجموع ${sum >= 1000000 ? (sum/1000000).toFixed(1)+'M' : sum >= 1000 ? (sum/1000).toFixed(0)+'K' : sum.toFixed(0)}</div>
+    </div>`;
+  });
+  document.getElementById('kpi-bar').innerHTML = kpiHtml || '<div style="color:var(--text3);font-size:12px;">لا توجد بيانات رقمية</div>';
+
+  // Destroy old charts
+  Object.values(charts).forEach(c => { try{c.destroy()}catch{} });
+  charts = {};
+
+  let chartsHtml = '';
+  const chartIds = [];
+
+  // Chart 1: Distribution of first numeric col
+  if (numCols[0]) {
+    chartsHtml += `<div class="chart-card"><h3>${numCols[0]} — توزيع القيم</h3><canvas id="ch1"></canvas></div>`;
+    chartIds.push({id:'ch1', col: numCols[0], type:'bar_dist'});
+  }
+  // Chart 2: Category breakdown
+  if (catCols[1] || catCols[0]) {
+    const cc = catCols.find(c => { const u = [...new Set(cleanData.map(r=>r[c]))]; return u.length>=2 && u.length<=12; }) || catCols[0];
+    if (cc) { chartsHtml += `<div class="chart-card"><h3>${cc} — التوزيع</h3><canvas id="ch2"></canvas></div>`; chartIds.push({id:'ch2',col:cc,type:'pie'}); }
+  }
+  // Chart 3: Second numeric col over time/category
+  if (numCols[1]) {
+    chartsHtml += `<div class="chart-card"><h3>${numCols[1]} — مقارنة</h3><canvas id="ch3"></canvas></div>`;
+    chartIds.push({id:'ch3',col:numCols[1],type:'line'});
+  }
+  // Chart 4: Correlation scatter
+  if (numCols[0] && numCols[1]) {
+    chartsHtml += `<div class="chart-card"><h3>${numCols[0]} vs ${numCols[1]}</h3><canvas id="ch4"></canvas></div>`;
+    chartIds.push({id:'ch4',col:numCols[0],col2:numCols[1],type:'scatter'});
+  }
+
+  document.getElementById('charts-grid').innerHTML = chartsHtml;
+
+  setTimeout(() => {
+    const colors = ['rgba(79,142,247,0.8)','rgba(124,58,237,0.8)','rgba(6,214,160,0.8)','rgba(245,158,11,0.8)','rgba(239,68,68,0.8)'];
+    Chart.defaults.color = '#8892aa';
+    Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
+
+    chartIds.forEach(({id,col,col2,type}) => {
+      const canvas = document.getElementById(id);
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+
+      if (type === 'bar_dist') {
+        const vals = cleanData.map(r=>r[col]).filter(v=>typeof v==='number').sort((a,b)=>a-b);
+        const bins = 8, min = vals[0], max = vals[vals.length-1], step = (max-min)/bins;
+        const buckets = Array(bins).fill(0);
+        vals.forEach(v => { const bi = Math.min(Math.floor((v-min)/step), bins-1); buckets[bi]++; });
+        charts[id] = new Chart(ctx, {type:'bar', data:{labels:buckets.map((_,i)=>`${Math.round(min+i*step).toLocaleString()}`), datasets:[{data:buckets,backgroundColor:colors[0],borderRadius:4}]}, options:{plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{grid:{color:'rgba(255,255,255,0.04)'}}}}});
+      } else if (type === 'pie') {
+        const counts = {};
+        cleanData.forEach(r => { const v=String(r[col]||'?'); counts[v]=(counts[v]||0)+1; });
+        const labels = Object.keys(counts).slice(0,8);
+        charts[id] = new Chart(ctx, {type:'doughnut', data:{labels, datasets:[{data:labels.map(l=>counts[l]),backgroundColor:colors,borderColor:'transparent'}]}, options:{plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:12}}}}});
+      } else if (type === 'line') {
+        const vals = cleanData.map(r=>r[col]).filter(v=>typeof v==='number').slice(0,40);
+        charts[id] = new Chart(ctx, {type:'line', data:{labels:vals.map((_,i)=>i+1), datasets:[{data:vals,borderColor:colors[2],backgroundColor:'rgba(6,214,160,0.08)',tension:0.4,fill:true,pointRadius:2}]}, options:{plugins:{legend:{display:false}},scales:{x:{display:false},y:{grid:{color:'rgba(255,255,255,0.04)'}}}}});
+      } else if (type === 'scatter') {
+        const pts = cleanData.filter(r=>typeof r[col]==='number'&&typeof r[col2]==='number').slice(0,100).map(r=>({x:r[col],y:r[col2]}));
+        charts[id] = new Chart(ctx, {type:'scatter', data:{datasets:[{data:pts,backgroundColor:colors[3],pointRadius:4}]}, options:{plugins:{legend:{display:false}},scales:{x:{title:{display:true,text:col},grid:{color:'rgba(255,255,255,0.04)'}},y:{title:{display:true,text:col2},grid:{color:'rgba(255,255,255,0.04)'}}}}});
+      }
+    });
+  }, 100);
+}
+
+// ============ AI CHAT ============
+function buildDataSummary() {
+  const numCols = columns.filter(c => cleanData.some(r => typeof r[c] === 'number'));
+  const stats = {};
+  numCols.forEach(c => {
+    const vals = cleanData.map(r=>r[c]).filter(v=>typeof v==='number');
+    if (!vals.length) return;
+    const mean = vals.reduce((a,v)=>a+v,0)/vals.length;
+    const std = Math.sqrt(vals.reduce((a,v)=>a+(v-mean)**2,0)/vals.length);
+    stats[c] = { mean: +mean.toFixed(2), std: +std.toFixed(2), min: Math.min(...vals), max: Math.max(...vals), count: vals.length };
+  });
+  const catCols = columns.filter(c => !numCols.includes(c));
+  const catStats = {};
+  catCols.forEach(c => {
+    const counts = {};
+    cleanData.forEach(r => { const v=String(r[c]||'فارغ'); counts[v]=(counts[v]||0)+1; });
+    catStats[c] = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  });
+  return {
+    rows: cleanData.length, columns: columns.length,
+    nulls: countNulls(cleanData), dups: countDups(cleanData),
+    numericStats: stats, categoricalStats: catStats,
+    sampleRow: cleanData[0]
+  };
+}
+
+async function sendChat() {
+  const input = document.getElementById('chat-input');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  if (!cleanData.length) { appendMsg('user', msg); appendMsg('ai', '⚠️ الرجاء تحميل بيانات أولاً لأتمكن من تحليلها.'); return; }
+  appendMsg('user', msg);
+  await callAI(msg);
+}
+
+function sendQuick(msg) {
+  if (!cleanData.length) { toast('⚠️ حمّل بيانات أولاً'); return; }
+  appendMsg('user', msg);
+  callAI(msg);
+}
+
+function appendMsg(role, text) {
+  const h = document.getElementById('chat-history');
+  const div = document.createElement('div');
+  div.className = `chat-msg msg-${role}`;
+  div.innerHTML = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g,'<br>');
+  h.appendChild(div);
+  h.scrollTop = h.scrollHeight;
+  chatMessages.push({role: role === 'user' ? 'user' : 'assistant', content: text});
+}
+
+function showThinking() {
+  const h = document.getElementById('chat-history');
+  const div = document.createElement('div');
+  div.className = 'msg-thinking';
+  div.id = 'thinking';
+  div.innerHTML = `<span>Claude يفكر</span><div class="dot-anim"><span></span><span></span><span></span></div>`;
+  h.appendChild(div);
+  h.scrollTop = h.scrollHeight;
+}
+
+async function callAI(userMsg) {
+  showThinking();
+  const summary = buildDataSummary();
+  const systemPrompt = `أنت محلل بيانات خبير. لديك وصول لمجموعة بيانات بالتفاصيل التالية:
+- عدد الصفوف: ${summary.rows}
+- عدد الأعمدة: ${summary.columns}
+- القيم الفارغة: ${summary.nulls}
+- الصفوف المكررة: ${summary.dups}
+- الأعمدة: ${columns.join('، ')}
+
+الإحصاءات الرقمية: ${JSON.stringify(summary.numericStats, null, 2)}
+التوزيعات الفئوية: ${JSON.stringify(summary.categoricalStats, null, 2)}
+مثال على صف: ${JSON.stringify(summary.sampleRow)}
+
+أجب باللغة العربية بشكل مفصل ومفيد. استخدم **bold** للتأكيد. أعط أرقاماً ومقارنات محددة. كن عملياً وقدم توصيات قابلة للتطبيق.`;
+
+  const msgs = chatMessages.slice(-6).map(m => ({role: m.role, content: m.content}));
+  msgs.push({role: 'user', content: userMsg});
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1000, system: systemPrompt, messages: msgs })
+    });
+    const data = await res.json();
+    const reply = data.content?.map(b => b.text || '').join('') || 'حدث خطأ في الاتصال';
+    document.getElementById('thinking')?.remove();
+    appendMsg('ai', reply);
+    renderAIResult(userMsg, reply);
+  } catch(e) {
+    document.getElementById('thinking')?.remove();
+    appendMsg('ai', '❌ خطأ في الاتصال بـ API. تأكد من الاتصال بالإنترنت.');
+  }
+}
+
+function renderAIResult(question, answer) {
+  const results = document.getElementById('ai-results');
+  const card = document.createElement('div');
+  card.className = 'ai-result-card';
+  card.innerHTML = `
+    <h3>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+      ${question}
+    </h3>
+    <p style="font-size:13px; color:var(--text2); line-height:1.8;">${answer.replace(/\*\*(.*?)\*\*/g,'<strong style="color:var(--text)">$1</strong>').replace(/\n/g,'<br>')}</p>
+  `;
+  const noData = results.querySelector('.no-data');
+  if (noData) noData.remove();
+  results.insertBefore(card, results.firstChild);
+}
+
+// ============ EXPORT ============
+function exportCSV() {
+  if (!cleanData.length) { toast('⚠️ لا توجد بيانات للتصدير'); return; }
+  const csv = Papa.unparse(cleanData);
+  const blob = new Blob(['\uFEFF' + csv], {type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'cleaned_data.csv';
+  a.click();
+  toast('✓ تم تصدير البيانات');
+}
+
+// ============ TOAST ============
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.remove('show'), 2800);
+}
+</script>
+</body>
+</html>
